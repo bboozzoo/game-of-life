@@ -5,12 +5,16 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define ARR_W 128
-#define ARR_H 96
-#define VIDEO_W 640
-#define VIDEO_H 480
+#define VIDEO_W 1024
+#define VIDEO_H 768
 #define VIDEO_BPP 32
+
+#define CELL_W 1
+#define CELL_H 1
+#define ARR_W (VIDEO_W / CELL_W)
+#define ARR_H (VIDEO_H / CELL_H)
 #define PIX_CNT 100
+
 #define LOG(...) \
     do { \
         fprintf(stderr, __VA_ARGS__); \
@@ -42,6 +46,7 @@ static struct worlds {
 
 static SDL_Surface * surface = NULL;
 static bool run = false;
+static bool pause = false;
 static inline void world_make_empty(struct world * w, uint32_t x, uint32_t y);
 static inline void world_make_fill(struct world * w, uint32_t x, uint32_t y);
 
@@ -118,21 +123,42 @@ init_world() {
         }
     }
 
-    for (int i = 10; i > 0; i--) {
-        world_make_fill(UCURRENT, ARR_W / 2 - i, ARR_H / 2 - i);
-        world_make_fill(UCURRENT, ARR_W / 2 + i, ARR_H / 2 + i);
-        world_make_fill(UCURRENT, ARR_W / 2 - i, ARR_H / 2 + i);
-        world_make_fill(UCURRENT, ARR_W / 2 + i, ARR_H / 2 - i);
+#if 1
+    for (int x = 0; x < 10; x++) {
+        int32_t offs_x = random() % ARR_W;
+        int32_t offs_y = random() % ARR_H;
+        for (int i = random() % 10; i > 0; i--) {
+            for (int j = random() % 10; j > 0; j--) {
+                world_make_fill(UCURRENT, offs_x - i, offs_y + j);
+                world_make_fill(UCURRENT, offs_x + i, offs_y + j);
+                world_make_fill(UCURRENT, offs_x - i, offs_y - j);
+                world_make_fill(UCURRENT, offs_x + i, offs_y - j);
+            }
+        }
     }
+#else
+    int32_t offs_x = ARR_W / 2;
+    int32_t offs_y = ARR_H / 2;
+    world_make_fill(UCURRENT, offs_x , offs_y);
+    world_make_fill(UCURRENT, offs_x + 1, offs_y);
+    world_make_fill(UCURRENT, offs_x, offs_y + 1);
+    world_make_fill(UCURRENT, offs_x + 1,  offs_y + 1);
+    world_make_fill(UCURRENT, offs_x + 2, offs_y);
+#endif
+
 }
 
 static inline void 
 world_make_empty(struct world * w, uint32_t x, uint32_t y) {
+    if (x >= ARR_W || y >= ARR_H)
+        return;
     w->w[x][y].empty = true;
 }
 
 static inline void 
 world_make_fill(struct world * w, uint32_t x, uint32_t y) {
+    if (x >= ARR_W || y >= ARR_H)
+        return;
     w->w[x][y].empty = false;
 }
 
@@ -169,17 +195,19 @@ world_will_survive(struct world * w, uint32_t x, uint32_t y) {
     LOG("[%d, %d] >>\n", x, y);
     LOG("[%u, %u] e: %d n: %d\n", x, y, UCURRENT->w[x][y].empty, neighbors_cnt);
 #endif
-    if (neighbors_cnt >= 2 && neighbors_cnt <= 3)
-        return true;
-    if (w->w[x][y].empty == true && neighbors_cnt == 3)
-        return true;
+    if (w->w[x][y].empty == false) {
+        if (neighbors_cnt >= 1 && neighbors_cnt <= 5)
+            return true;
+    } else {
+        if (neighbors_cnt == 3)
+            return true;
+    }
     return false;
 }
 
 void
 next_generation() 
 {
-    LOG("next gen\n");
     for(int i = 1; i < ARR_W - 1; i++) {
         for (int j = 1; j < ARR_H - 1; j++) {
 #if 1
@@ -212,32 +240,43 @@ draw()
     /*uint32_t cnt = random() % PIX_CNT;*/
     for(int i = 0; i < ARR_W; i++) {
         for (int j = 0; j < ARR_H; j++) {
+            uint32_t color = COLOR_BLACK;
             if (UCURRENT->w[i][j].empty == false)
-                boxColor(surface, i * 5, j * 5, i * 5 + 5, j * 5 + 5, COLOR_WHITE);
-            else
-                boxColor(surface, i * 5, j * 5, i * 5 + 5, j * 5 + 5, COLOR_BLACK);
+                color = COLOR_WHITE;
+            boxColor(surface, i * CELL_W, j * CELL_H, i * CELL_W + CELL_W, j * CELL_H + CELL_H, color);
         }
     }
 }
 
 int main(int argc, char * argv[]) {
+    uint32_t generation = 0;
     init_gfx();
     init_random();
     run = true;
 
     init_world();
-    LOG("run\n");
     while(run) {
         SDL_Event sdl_ev;
         if (SDL_PollEvent(&sdl_ev) != 0) {
-            if (sdl_ev.type == SDL_KEYDOWN && sdl_ev.key.keysym.sym == SDLK_q)
-                run = false;
+            if (sdl_ev.type == SDL_KEYDOWN)
+                switch (sdl_ev.key.keysym.sym) {
+                    case SDLK_q:
+                        run = false;
+                        break;
+                    case SDLK_SPACE:
+                        pause = !pause;
+                        break;
+                    default:
+                        break;
+                }
         }
-        LOG("draw\n");
-        draw();
-        SDL_Flip(surface);
-        next_generation(); 
-        SDL_Delay(50);
+        if (!pause) {
+            draw();
+            SDL_Flip(surface);
+            next_generation(); 
+            generation++;
+    /*        SDL_Delay(50); */
+        }
     }
     SDL_Quit();
     return 0;
