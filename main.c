@@ -124,19 +124,19 @@ init_world() {
     }
 
 #if 1
-    for (int x = 0; x < 10; x++) {
-        int32_t offs_x = random() % ARR_W;
-        int32_t offs_y = random() % ARR_H;
+    for (int x = 0; x < 30; x++) {
+        int32_t offs_x = (random() % ARR_W) - CELL_W;
+        int32_t offs_y = (random() % ARR_H) - CELL_H;
         for (int i = random() % 10; i > 0; i--) {
             for (int j = random() % 10; j > 0; j--) {
-                world_make_fill(UCURRENT, offs_x - i, offs_y + j);
                 world_make_fill(UCURRENT, offs_x + i, offs_y + j);
                 world_make_fill(UCURRENT, offs_x - i, offs_y - j);
                 world_make_fill(UCURRENT, offs_x + i, offs_y - j);
             }
         }
     }
-#else
+#endif
+#if 0
     int32_t offs_x = ARR_W / 2;
     int32_t offs_y = ARR_H / 2;
     world_make_fill(UCURRENT, offs_x , offs_y);
@@ -199,7 +199,7 @@ world_will_survive(struct world * w, uint32_t x, uint32_t y) {
         if (neighbors_cnt >= 1 && neighbors_cnt <= 5)
             return true;
     } else {
-        if (neighbors_cnt == 3)
+        if (neighbors_cnt >= 3 && neighbors_cnt <= 3)
             return true;
     }
     return false;
